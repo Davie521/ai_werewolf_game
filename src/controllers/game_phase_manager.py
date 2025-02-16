@@ -1,6 +1,6 @@
 from typing import Dict, Optional, Tuple, List
 from ..models.game_state import GameState, GamePhase, WinningTeam
-from ..models.game_log import GameLog
+from ..models.game_log import GameLog, GameEvent, GameEventType
 from ..models.roles.base_role import RoleType
 from .api_controller import APIController
 from .phases.night_phase_controller import NightPhaseController
@@ -87,10 +87,17 @@ class GamePhaseManager:
         if next_phase:
             self.game_state.current_phase = next_phase
             
-            # 如果进入新的夜晚,开始新的回合
+            # 只在新回合开始时记录事件
             if next_phase == GamePhase.NIGHT_START:
+                self.game_log.add_event(GameEvent(
+                    GameEventType.ROUND_START,
+                    {
+                        "round_number": self.game_state.round_number + 1  # +1 因为新回合还未开始
+                    }
+                ))
+                # 开始新的回合
                 self.game_state.start_new_round()
-                
+            
         return next_phase
     
     def _has_hunter_died_this_round(self) -> bool:

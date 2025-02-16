@@ -125,4 +125,35 @@ class NightPhaseController(BasePhaseController):
                 if target_id and witch.role.has_potion("poison"):
                     self.game_state.current_round.night_action.witch_poison = target_id
     
+    async def _handle_seer_turn(self) -> None:
+        """处理预言家回合"""
+        seer = next((p for p in self.game_state.get_alive_players() 
+                    if p.role.role_type == RoleType.SEER), None)
+        
+        if seer:
+            action = await self.game_state.role_controllers[RoleType.SEER].handle_night_action(seer.id)
+            
+            # 记录查验结果
+            if "seer_check" in action:
+                target_id = action["seer_check"]["target_id"]
+                target = self.game_state.get_player_by_id(target_id)
+                if target:
+                    is_werewolf = target.role.role_type == RoleType.WEREWOLF
+                    self.game_state.current_round.night_action.seer_check = {
+                        "target_id": target_id,
+                        "is_werewolf": is_werewolf
+                    }
+                    # 记录事件
+                    self.game_log.add_event(GameEvent(
+                        GameEventType.NIGHT_ACTION,
+                        {
+                            "seer_check": {
+                                "target": target.name,
+                                "is_werewolf": is_werewolf
+                            }
+                        },
+                        public=False,
+                        visible_to=[seer.id]  # 只有预言家能看到查验结果
+                    ))
+    
     # ... 其他回合的处理方法 ... 

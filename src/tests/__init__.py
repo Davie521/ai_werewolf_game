@@ -1,3 +1,3 @@
 """
-Test package for AI Werewolf Game
+Test Package for AI Werewolf Game
 """ 

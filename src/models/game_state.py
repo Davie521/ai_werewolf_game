@@ -229,3 +229,67 @@ class GameState:
             "rounds": self.round_number
         }
     
+    def get_last_night_dead_players(self) -> List[Dict]:
+        """获取昨晚死亡的玩家列表
+        
+        Returns:
+            List[Dict]: 死亡玩家列表，每个玩家包含 id、name、role 和 death_reason
+        """
+        if not self.current_round:
+            return []
+            
+        dead_players = []
+        for death in self.current_round.deaths:
+            if death["time"] == "night":  # 只返回夜晚死亡的玩家
+                player = self.get_player_by_id(death["player_id"])
+                if player:
+                    dead_players.append({
+                        "id": player.id,
+                        "name": player.name,
+                        "role": player.role.role_type.value,
+                        "death_reason": death["reason"]
+                    })
+        return dead_players
+    
+    def check_game_over(self) -> Tuple[bool, Optional[WinningTeam]]:
+        """检查游戏是否结束
+        
+        Returns:
+            Tuple[bool, Optional[WinningTeam]]: (是否结束, 获胜阵营)
+        """
+        # 获取存活玩家
+        alive_players = self.get_alive_players()
+        
+        # 统计存活的狼人和好人
+        alive_werewolves = sum(1 for p in alive_players if p.role.role_type == RoleType.WEREWOLF)
+        alive_villagers = len(alive_players) - alive_werewolves
+        
+        # 判断游戏是否结束
+        if alive_werewolves == 0:
+            # 狼人全部死亡，好人胜利
+            self._game_over = True
+            self._winning_team = WinningTeam.VILLAGER
+            return True, WinningTeam.VILLAGER
+        elif alive_werewolves >= alive_villagers:
+            # 狼人数量大于等于好人数量，狼人胜利
+            self._game_over = True
+            self._winning_team = WinningTeam.WEREWOLF
+            return True, WinningTeam.WEREWOLF
+            
+        # 游戏继续
+        return False, None
+    
+    def get_last_check_result(self, seer_id: int) -> Optional[Dict]:
+        """获取预言家的最后一次查验结果
+        
+        Args:
+            seer_id: 预言家ID
+            
+        Returns:
+            Optional[Dict]: 最后一次查验结果，包含 target_id 和 is_werewolf，如果没有查验结果则返回 None
+        """
+        if not self.current_round:
+            return None
+            
+        return self.current_round.night_action.seer_check
+    

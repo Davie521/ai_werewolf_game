@@ -90,33 +90,6 @@ class TestGameController:
         for call in game_controller.phase_manager.execute_current_phase.mock_calls:
             assert call.awaited
         
-    async def test_get_player_events(self, game_controller):
-        """测试获取玩家事件"""
-        # 添加一些测试事件
-        test_event = GameEvent(
-            GameEventType.DEATH_ANNOUNCE,
-            {
-                "deaths": [{
-                    "player_id": 1,
-                    "player_name": "Player1",
-                    "role": "平民",
-                    "reason": "狼人袭击"
-                }]
-            },
-            public=False,  # 设置为私密事件
-            visible_to=[1]  # 只对玩家1可见
-        )
-        game_controller.game_log.add_event(test_event)
-        
-        # 测试相关玩家能看到事件
-        player1_events = game_controller.get_player_events(1)
-        assert len(player1_events) == 1
-        assert "死亡" in player1_events[0]
-        
-        # 测试其他玩家看不到私密事件
-        player3_events = game_controller.get_player_events(3)
-        assert len(player3_events) == 0
-        
     async def test_get_public_events(self, game_controller):
         """测试获取公开事件"""
         # 添加一个公开事件

@@ -11,6 +11,7 @@ import time
 
 class APIController:
     
+    
     def __init__(self, model_name="deepseek-r1"):
         self.system_prompts = self._init_role_prompts()
         self._loading_task = None
@@ -21,6 +22,7 @@ class APIController:
         """初始化每个角色的系统提示词"""
         return {
             RoleType.WEREWOLF: """你正在参与一个狼人杀游戏。这是一个推理策略游戏，玩家分为两个阵营：狼人阵营和好人阵营。
+
 
                                  游戏规则：
                                  1. 游戏分为白天和黑夜两个阶段交替进行
@@ -427,28 +429,25 @@ class APIController:
                         return {"werewolf_kill": {"target_id": int(target_id)}}
             elif role_type == RoleType.SEER:
                 if "type" in action and action["type"] == "check" and "target_id" in action:
-                    target_name = action["target_id"]
-                    if isinstance(target_name, str):  # 确保 target_id 是字符串（玩家名字）
-                        return {"seer_check": {"target_id": target_name}}
+                    target_id = action["target_id"]
+                    if isinstance(target_id, (int, str)):  # 确保 target_id 是数字或字符串
+                        return {"seer_check": {"target_id": int(target_id)}}
             elif role_type == RoleType.WITCH:
-                print("[DEBUG] 女巫行动解析开始")
-                print(f"[DEBUG] 收到的响应: {action}")
-                
                 if "type" in action and action["type"] == "potion":
                     save_used = action.get("save", False)
                     poison_target = action.get("poison_target")
                     
-                    print(f"[DEBUG] 解药使用: {save_used}")
-                    print(f"[DEBUG] 毒药目标: {poison_target}")
+                    # 验证毒药目标
+                    if poison_target is not None and not isinstance(poison_target, (int, str)):
+                        print("[API] 警告: 毒药目标ID格式不正确")
+                        poison_target = None
                     
                     result = {
-                        "witch_save": {"used": save_used},
-                        "witch_poison": {"target_id": poison_target}
+                        "witch_save": {"used": bool(save_used)},
+                        "witch_poison": {"target_id": int(poison_target) if poison_target is not None else None}
                     }
-                    print(f"[DEBUG] 返回结果: {result}")
+                    print(f"[API] 女巫行动解析结果: {result}")
                     return result
-                else:
-                    print("[DEBUG] 女巫行动格式不正确")
             return {}
         except Exception as e:
             print(f"[API] 解析错误: {str(e)}")
@@ -628,33 +627,43 @@ class APIController:
         
         prompt = f"""现在是第{game_state.round_number}天晚上。\n"""
         
+        # 解药相关提示
         if witch_potions["save"]:
             if killed_player:
                 # 添加自救规则说明
                 is_self = killed_player.id == witch.id
                 if is_self:
-                    if self.game_state.round_number == 0:
+                    if game_state.round_number == 0:
                         prompt += f"今晚你被狼人杀害了。这是第一夜，你可以使用解药自救。\n"
                     else:
-                        prompt += f"今晚你被狼人杀害了，但你不能在第一夜之后自救。\n"
+                        prompt += f"今晚你被狼人杀害了，但根据规则你不能在第一夜之后自救。\n"
                 else:
-                    prompt += f"今晚{killed_player.name}被狼人杀害了。你还有一瓶解药，是否要使用？\n"
+                    prompt += f"今晚{killed_player.name}被狼人杀害了。你有一瓶解药，是否要使用？\n"
             else:
                 prompt += "今晚没有玩家被狼人杀害。\n"
         else:
-            prompt += "你已经用掉了解药。\n"
+            prompt += "你的解药已经用过了。\n"
             
+        # 毒药相关提示
         if witch_potions["poison"]:
-            prompt += "你还有一瓶毒药，是否要使用？\n"
+            prompt += "\n你还有一瓶毒药，可以选择使用。\n"
             # 添加存活玩家列表供选择
             alive_players = [p for p in game_state.get_alive_players() if p.id != witch.id]
-            prompt += "可选择的毒药目标：\n"
-            prompt += "\n".join([f"- {p.name} (ID: {p.id})" for p in alive_players]) + "\n"
+            if alive_players:
+                prompt += "可选择的毒药目标：\n"
+                prompt += "\n".join([f"- {p.name} (ID: {p.id})" for p in alive_players]) + "\n"
         else:
-            prompt += "你已经用掉了毒药。\n"
+            prompt += "\n你的毒药已经用过了。\n"
             
-        prompt += "注意：每晚最多使用一瓶药。\n"
-        prompt += """请用以下格式返回：{"type": "potion", "save": true/false, "poison_target": 玩家ID或null}
+        prompt += "\n重要规则：\n"
+        prompt += "1. 每种药只能使用一次\n"
+        prompt += "2. 每晚最多使用一瓶药\n"
+        prompt += "3. 自救仅限第一夜\n"
+        
+        prompt += """\n请用以下格式返回：
+                    {"type": "potion", "save": true/false, "poison_target": 玩家ID或null}
+                    
+                    示例：
                     - 使用解药救人：{"type": "potion", "save": true, "poison_target": null}
                     - 使用毒药毒人：{"type": "potion", "save": false, "poison_target": 1}
                     - 什么都不做：{"type": "potion", "save": false, "poison_target": null}"""
@@ -673,7 +682,11 @@ class APIController:
         prompt = f"""现在是第{game_state.round_number}天白天。\n"""
         
         if dead_players:
-            prompt += f"昨晚死亡的玩家：{', '.join([p.name for p in dead_players])}\n"
+            dead_info = []
+            for p in dead_players:
+                death_reason = "被狼人杀害" if p.death_reason == "werewolf" else "被女巫毒死"
+                dead_info.append(f"{p.name}（{death_reason}）")
+            prompt += f"昨晚死亡的玩家：{', '.join(dead_info)}\n"
         else:
             prompt += "昨晚是平安夜，没有玩家死亡。\n"
             
@@ -716,7 +729,9 @@ class APIController:
             # 获取昨晚的查验结果（只有预言家能看到）
             last_check = game_state.get_last_check_result(player.id)
             if last_check:
-                return f"昨晚查验结果：{last_check['player'].name} 是 {last_check['role']}"
+                target = game_state.get_player_by_id(last_check["target_id"])
+                if target:
+                    return f"昨晚查验结果：{target.name} {'是' if last_check['is_werewolf'] else '不是'}狼人"
         elif player.role.role_type == RoleType.WEREWOLF:
             # 获取其他狼人信息（只有当前狼人能看到）
             other_werewolves = game_state.get_werewolf_teammates(player.id)
@@ -726,7 +741,7 @@ class APIController:
             # 获取药水使用情况（只有女巫能看到）
             potions = game_state.get_witch_potions(player.id)
             return f"解药{'已用' if not potions['save'] else '未用'}，毒药{'已用' if not potions['poison'] else '未用'}"
-        return "" 
+        return ""
 
     async def _handle_werewolf_discussion(self, werewolves: List[Player], game_state: GameState) -> List[str]:
         """处理狼人夜间讨论"""

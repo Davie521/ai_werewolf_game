@@ -16,7 +16,7 @@ async def run_r1_game():
     game = GameController()
     
     # 设置使用 R1 模型
-    game.api_controller.set_model("r1")
+    game.api_controller.set_model("deepseek-r1")
     
     # 初始化玩家
     player_names = [
@@ -54,10 +54,11 @@ async def run_r1_game():
             await game.next_phase()
             
             # 打印这个阶段的事件
-            events = game.get_public_events(-10)
-            print("\n本阶段事件：")
-            for event in events:
-                print(event)
+            events = game.get_public_events(1)  # 只获取最近的1个事件
+            if events:
+                print("\n本阶段事件：")
+                for event in events:
+                    print(event)
             
             # 短暂暂停，便于观察
             await asyncio.sleep(2)

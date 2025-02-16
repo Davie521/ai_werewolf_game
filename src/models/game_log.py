@@ -79,7 +79,11 @@ class GameLog:
         
         # 游戏流程事件
         if event_type == GameEventType.GAME_START:
-            players_str = ", ".join([f"{p['name']} ({p['role']})" for p in details.get('players', [])])
+            players = details.get('players', [])
+            if players:
+                players_str = ", ".join([f"{p['name']}" for p in players])
+            else:
+                players_str = "无玩家"
             return f"游戏开始！共有{details.get('player_count', 0)}名玩家参与。\n玩家列表：{players_str}"
         
         elif event_type == GameEventType.GAME_END:
@@ -128,9 +132,9 @@ class GameLog:
             messages = []
             for death in deaths:
                 name = death.get("player_name", "某玩家")
-                role = f"({death.get('role', '')})"
+                role = death.get("role", "")
                 reason = death_reasons.get(death.get("reason", ""), death.get("reason", ""))
-                messages.append(f"{name}{role}{reason}")
+                messages.append(f"{name}({role}){reason}")
             return "昨晚" + "，".join(messages) + "。"
         
         elif event_type == GameEventType.PLAYER_SPEAK:

@@ -1,3 +1,3 @@
 """
-AI Werewolf Game
+AI Werewolf Game Package
 """ 

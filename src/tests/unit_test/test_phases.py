@@ -1,12 +1,12 @@
 import pytest
-from ...models.game_state import GameState, GamePhase, WinningTeam
-from ...models.game_log import GameLog
-from ...models.player import Player
-from ...models.roles.base_role import BaseRole, RoleType
+from src.models.game_state import GameState, GamePhase, WinningTeam
+from src.models.game_log import GameLog
+from src.models.player import Player
+from src.models.roles.base_role import BaseRole, RoleType
 
-from ...controllers.game_phase_manager import GamePhaseManager
-from ...controllers.api_controller import APIController
-from ..test_model.mock_api_controller import MockAPIController
+from src.controllers.game_phase_manager import GamePhaseManager
+from src.controllers.api_controller import APIController
+from src.tests.test_model.mock_api_controller import MockAPIController
 
 @pytest.fixture
 def game_setup():
