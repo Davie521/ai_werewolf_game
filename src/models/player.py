@@ -1,7 +1,7 @@
-from .role import Role, RoleType
+from .roles import BaseRole, RoleType
 
 class Player:
-    def __init__(self, player_id: int, name: str, role: Role):
+    def __init__(self, player_id: int, name: str, role: BaseRole):
         self.id = player_id
         self.name = name
         self.role = role

@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional
 from ..models.player import Player
-from ..models.role import RoleType
+from ..models.roles.base_role import RoleType
 from ..models.game_state import GameState, GamePhase
 from openai import OpenAI
 import json
