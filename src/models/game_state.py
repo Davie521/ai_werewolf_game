@@ -115,8 +115,26 @@ class GameState:
             return []
         return [p.name for p in self.players if p.id in self._checked_players[seer_id]]
     
+    def update_witch_potion(self, witch_id: int, potion_type: str, value: bool):
+        """更新女巫药水状态
+        
+        Args:
+            witch_id: 女巫ID
+            potion_type: 药水类型 ("save" 或 "poison")
+            value: 是否还有药水
+        """
+        if witch_id in self._witch_potions:
+            self._witch_potions[witch_id][potion_type] = value
+            
     def get_witch_potions(self, witch_id: int) -> Optional[Dict[str, bool]]:
-        """获取女巫药水状态"""
+        """获取女巫药水状态
+        
+        Args:
+            witch_id: 女巫ID
+            
+        Returns:
+            Dict[str, bool]: 药水状态字典，包含 "save" 和 "poison" 两个布尔值
+        """
         return self._witch_potions.get(witch_id, {"save": False, "poison": False}).copy()
     
     def get_werewolf_teammates(self, werewolf_id: int) -> List[Player]:

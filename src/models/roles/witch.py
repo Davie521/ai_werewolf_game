@@ -18,7 +18,7 @@ class Witch(BaseRole):
         Returns:
             bool: 是否使用成功
         """
-        if potion_type in self.potions and self.potions[potion_type]:
+        if self.has_potion(potion_type):
             self.potions[potion_type] = False  # 使用后药水消失
             return True
         return False
@@ -32,4 +32,4 @@ class Witch(BaseRole):
         Returns:
             bool: 是否还有药水可用
         """
-        return self.potions.get(potion_type, False)  # 检查药水是否还在 
+        return potion_type in self.potions and self.potions[potion_type] 

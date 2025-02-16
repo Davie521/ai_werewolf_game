@@ -5,6 +5,7 @@ from .api_controller import APIController
 from .game_phase_manager import GamePhaseManager
 from datetime import datetime
 from ..models.roles.base_role import RoleType
+from ..models.player import Player
 import os
 
 class GameController:
@@ -13,32 +14,34 @@ class GameController:
         self.game_log = GameLog()
         self.api_controller = api_controller or APIController()
         self.phase_manager = GamePhaseManager(self.game_state, self.game_log, self.api_controller)
-        self.game_output_file = None
         
         # 设置日志目录
         self.log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'game_logs'))
-        os.makedirs(self.log_dir, exist_ok=True)
+        self.game_log.initialize(self.log_dir)
         
-    async def initialize_game(self, player_names: List[str]):
+    async def initialize_game(self, player_names: List[str], preset_players: List[Player] = None):
         """初始化游戏
         - 分配角色
         - 创建日志
         - 记录初始状态
+        
+        Args:
+            player_names: 玩家名字列表
+            preset_players: 预设的玩家列表（用于测试）
         """
         # 重置游戏状态
         self.game_state.reset()
         
-        # 创建游戏日志文件
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_path = os.path.join(self.log_dir, f"game_log_{timestamp}.txt")
-        self.game_output_file = open(log_path, "w", encoding="utf-8")
-        
-        # 分配角色
-        roles = self._generate_roles(len(player_names))
-        for i, name in enumerate(player_names):
-            player = self._create_player(i + 1, name, roles[i])
-            self.game_state.add_player(player)
-            
+        if preset_players:
+            # 使用预设的玩家列表
+            for player in preset_players:
+                self.game_state.add_player(player)
+        else:
+            # 分配角色
+            roles = self._generate_roles(len(player_names))
+            for i, name in enumerate(player_names):
+                player = self._create_player(i + 1, name, roles[i])
+                self.game_state.add_player(player)
             
         # 记录游戏开始事件
         self._log_game_start(player_names)
@@ -49,6 +52,9 @@ class GameController:
             # 执行当前阶段
             await self.phase_manager.execute_current_phase()
             
+            # 写入当前阶段的事件到日志文件
+            self.game_log.write_phase_header(self.game_state.current_phase.value)
+            
             # 进入下一阶段
             next_phase = self.phase_manager.next_phase()
             if not next_phase:  # 游戏结束
@@ -58,45 +64,69 @@ class GameController:
     def get_player_events(self, player_id: int) -> List[str]:
         """获取指定玩家可见的事件"""
         events = [event for event in self.game_log.get_all_events() 
-                 if event['public'] or player_id in event['visible_to']]
+                 if event['public'] or player_id in event.get('visible_to', [])]
         return [self.game_log.format_event(event) for event in events]
         
     def get_public_events(self) -> List[str]:
         """获取所有公开事件"""
         events = [event for event in self.game_log.get_all_events() if event['public']]
         return [self.game_log.format_event(event) for event in events]
-        
-    def write_to_log(self, message: str):
-        """写入日志文件"""
-        if self.game_output_file:
-            self.game_output_file.write(message + "\n")
-            self.game_output_file.flush()
-            
+                
     def _log_game_start(self, player_names: List[str]):
         """记录游戏开始"""
+        self.game_log.write_phase_header("游戏开始")
+        
+        # 记录玩家和角色信息
+        players_info = []
+        for player in self.game_state.players:
+            players_info.append({
+                "id": player.id,
+                "name": player.name,
+                "role": player.role.name
+            })
+        
         self.game_log.add_event(GameEvent(
             GameEventType.GAME_START,
             {
                 "player_count": len(player_names),
-                "players": [{"id": i + 1, "name": name} for i, name in enumerate(player_names)]
+                "players": players_info
             }
         ))
+        
+        # 记录每个玩家的角色（上帝视角）
+        self.game_log.write_phase_header("玩家角色")
+        for player in self.game_state.players:
+            self.game_log.write_to_log(f"{player.name}: {player.role.name}")
+        self.game_log.write_to_log("")  # 添加空行分隔
         
     def _log_game_end(self):
         """记录游戏结束"""
         result = self.game_state.get_game_result()
+        self.game_log.write_phase_header("游戏结束")
         self.game_log.add_event(GameEvent(
             GameEventType.GAME_END,
             result
         ))
         
-        if self.game_output_file:
-            self.game_output_file.close()
+        # 写入游戏总结
+        alive_players = [
+            {"name": p.name, "role": p.role.role_type.value}
+            for p in self.game_state.get_alive_players()
+        ]
+        dead_players = [
+            {
+                "name": p.name,
+                "role": p.role.role_type.value,
+                "death_reason": p.death_reason
+            }
+            for p in self.game_state.players if not p.is_alive
+        ]
+        self.game_log.write_game_summary(alive_players, dead_players)
+        self.game_log.close()
             
     def cleanup(self):
         """清理资源"""
-        if self.game_output_file:
-            self.game_output_file.close()
+        self.game_log.close()
             
     def _generate_roles(self, player_count: int) -> List[RoleType]:
         """根据玩家数量生成角色列表

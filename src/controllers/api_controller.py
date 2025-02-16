@@ -10,6 +10,7 @@ import sys
 import time
 
 class APIController:
+    
     def __init__(self, model_name="deepseek-r1"):
         self.system_prompts = self._init_role_prompts()
         self._loading_task = None
